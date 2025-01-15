@@ -1,0 +1,7 @@
+﻿  sqlite3.c
+  VendingMachine.cpp
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 2629 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  VendingMachine.vcxproj -> C:\Users\User\Desktop\Vending\VendingMachine\x64\Release\VendingMachine.exe
