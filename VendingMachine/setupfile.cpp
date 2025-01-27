@@ -4,11 +4,12 @@
 using namespace std;
 
 
+
 void Setup() {
 	sqlite3* db;
 	char* Errmsg = nullptr;
 	int rc;
-
+	sqlite3_stmt* stmt;
 	const char* SQLSnackTable = R"(
 CREATE TABLE IF NOT EXISTS snack (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,9 +26,19 @@ amount INTEGER NOT NULL
 );
 )";
 
+	const char* MoneySetUp = R"(
+INSERT INTO money(value,amount) VALUES
+(1,10),
+(5,10),
+(10,10),
+(20,5),
+(100,2);
+)";
+
 	const char* SQLHistoryTable = R"(
 CREATE TABLE IF NOT EXISTS history (
 id INTEGER PRIMARY KEY AUTOINCREMENT,
+name TEXT NOT NULL,
 buyerid INTEGER NOT NULL,
 price INTEGER NOT NULL
 );
@@ -52,6 +63,14 @@ price INTEGER NOT NULL
 	rc = sqlite3_exec(db, SQLHistoryTable, nullptr, nullptr, &Errmsg);
 	if (rc != SQLITE_OK) {
 		cerr << "Error Creating History Table:" << Errmsg << endl;
+	}
+
+	if (sqlite3_prepare_v2(db, MoneySetUp, -1, &stmt, nullptr) != SQLITE_OK) {
+		cerr << sqlite3_errmsg(db) << endl;
+	}
+
+	if (sqlite3_step(stmt) != SQLITE_DONE) {
+		cerr << sqlite3_errmsg(db) << endl;
 	}
 
 	cout << "Created Succesfully" << endl;

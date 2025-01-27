@@ -1,2 +1,3 @@
 ﻿  VendingMachine.cpp
-  VendingMachine.vcxproj -> C:\Users\User\Desktop\Vending\VendingMachine\x64\Debug\VendingMachine.exe
+C:\Users\ASUS\Desktop\VendingMachine\VendingMachine\VendingMachine.cpp(355,1): warning C4715: 'User::GetPrice': not all control paths return a value
+  VendingMachine.vcxproj -> C:\Users\ASUS\Desktop\VendingMachine\x64\Debug\VendingMachine.exe

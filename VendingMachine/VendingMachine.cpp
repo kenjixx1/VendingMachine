@@ -2,9 +2,19 @@
 #include <iostream>
 #include "sqlite/sqlite3.h"
 #include <string>
+#include <tuple>
 using namespace std;
 
 void Setup();
+
+struct Product {
+    string name;
+    int price, stock;
+
+    Product(string n, int p, int s)
+        :name(n), price(p), stock(s) {
+    }
+};
 
 class Database {
 protected:
@@ -52,7 +62,7 @@ public:
             sqlite3_free(errMsg);
         }
         else {
-            cout << "Query executed successfully.\n";
+            //cout << "Query executed successfully.\n";
         }
     }
     void InsertMoney(int value, int amount) {
@@ -63,7 +73,7 @@ public:
             cerr << "Error Peparing Insert Money:" << sqlite3_errmsg(db) << endl;
         }
         else {
-            cout << "Prepared || Money " << endl;
+            //cout << "Prepared || Money " << endl;
 
         }
 
@@ -72,9 +82,6 @@ public:
        
         if (sqlite3_step(stmt) != SQLITE_DONE) {
             cerr << "Error Executing statement:" << sqlite3_errmsg(db) << endl;
-        }
-        else {
-            cout << "Inserted" << endl;
         }
 
         sqlite3_finalize(stmt);
@@ -146,6 +153,8 @@ INSERT INTO users(name,studentid,age) VALUES (?,?,?);
         }
     }
 
+
+
     void InsertProduct() {
         string name;
         int price;
@@ -185,18 +194,48 @@ INSERT INTO users(name,studentid,age) VALUES (?,?,?);
         sqlite3_finalize(stmt);
     }
 
+    void InsertProduct(string& name, int price, int stock) {
+        const char* i_product = "INSERT INTO temptable(name,price,stock) VALUES(?,?,?);";
 
+        sqlite3_stmt* stmt;
 
-   
+        if (sqlite3_prepare_v2(db, i_product, -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error:" << sqlite3_errmsg(db) << endl;
+        }
+        else {
+            cout << "Prepared" << endl;
+        }
 
+        sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 2, price);
+        sqlite3_bind_int(stmt, 3, stock);
+
+        if (sqlite3_step(stmt) == SQLITE_DONE) {
+            cout << "Inserted Product" << endl;
+        }
+        else {
+            cerr << "Error Inserting Product||" << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_finalize(stmt);
+    }
 };
+
+
+
 
 class User :public Database {
 protected:
     int to_pay = 0;
+    int studentid;
 public:
+
+
+    void CloseVendingMachine() {
+        cout << "Vending Machine Closed." << endl;
+        exit(0);
+    }
     void Login() {
-        int studentid;
         cout << "Student ID:";
         cin >> studentid;
 
@@ -225,6 +264,60 @@ public:
         
     }
 
+    int GetProductLen() {
+        string displayproduct = "SELECT * FROM snack;";
+        sqlite3_stmt* stmt;
+        int count = 0;
+        if (sqlite3_prepare_v2(db, displayproduct.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Displaying Product || " << sqlite3_errmsg(db) << endl;
+        }
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int id = sqlite3_column_int(stmt, 0);
+            const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            int price = sqlite3_column_int(stmt, 2);
+            int stock = sqlite3_column_int(stmt, 3);
+            count++;
+        }
+        cout << "------------------"<< count <<"------------------" << endl;
+        sqlite3_finalize(stmt);
+        return count;
+    }
+
+    void RenameTableToSnack() {
+        string rename = "ALTER TABLE temptable RENAME TO snack;";
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(db, rename.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Renaming:" << sqlite3_errmsg(db) << endl;
+        }
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << "Error" << endl;
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+    Product GetProductInfo(int productid) {
+        string getinfo = "SELECT * FROM snack WHERE id = "+to_string(productid)+";";
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(db, getinfo.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Preparing Getting info:" << sqlite3_errmsg(db) << endl;
+        }
+        string name;
+        int price;
+        int stock;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            price = sqlite3_column_int(stmt, 2);
+            stock = sqlite3_column_int(stmt, 3);
+        }
+
+        sqlite3_finalize(stmt);
+        return Product(name, price, stock);
+    }
+    
     void RemoveProduct(int id) {
         const char* removeproduct = "UPDATE snack SET stock = stock - 1 WHERE id = ?;";
         sqlite3_stmt* stmt;
@@ -232,8 +325,6 @@ public:
         if (sqlite3_prepare_v2(db, removeproduct, -1, &stmt, nullptr) != SQLITE_OK) {
             cerr << "Error Prepared Removing Product:" << sqlite3_errmsg(db) << endl;
         }
-        
-
         sqlite3_bind_int(stmt, 1, id);
 
         if (sqlite3_step(stmt) != SQLITE_DONE) {
@@ -269,24 +360,66 @@ class Admin :public User {
 public:
     void AdminMenu() {
         int choice;
-        cout << "[Admin Menu]\n[1]Restock\n[2]Add Product\n[3]Update Product\n[4]View Product\n[5]Search Product\n[6]\n";
+        cout << "[Admin Menu]\n[1]Restock\n[2]Add Product\n[3]Remove Product\n[4]Reset Money/Take\n[5]Show Money\n[6]History\n";
         cin >> choice;
-        if (choice == 2) {
-
+        switch (choice) {
+        case 1:
+            RestockProduct();
+            break;
+        case 2:
             InsertProduct();
+            break;
+        case 3:
+            AdminRemoveProduct();
+            break;
+
+        case 4:
+            ResetMoney();
+            break;
+        case 5:
+            ShowMoney();
+            break;
+        case 6:
+            ShowHistory();
+            break;
         }
         
     }
 
+    void ResetMoney() {
+        int amount, value;
+        cout << "Value[1,5,10,20,100]:";
+        cin >> value;
+        cout << "Amount:";
+        cin >> amount;
+        const char* i_money = "UPDATE money SET amount = ? WHERE value = ?;";
+
+        sqlite3_stmt* stmt;
+        if (sqlite3_prepare_v2(db, i_money, -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Peparing Insert Money:" << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_bind_int(stmt, 1, amount);
+        sqlite3_bind_int(stmt, 2, value);
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << "Error Executing statement:" << sqlite3_errmsg(db) << endl;
+        }
+
+        sqlite3_finalize(stmt);
+
+    }
+
     void RestockProduct() {
-        string name;
-        cout << "Name Of product that you want to restock:";
-        cin >> name;
+        DisplayProduct("snack");
+        int id;
+        cout << "ID Of product that you want to restock:";
+        cin >> id;
         int amount;
         cout << "How much would you like to restock? :";
         cin >> amount;
 
-        const char* restockproduct = "UPDATE snack SET stock = stock + ? where name = ?;";
+        const char* restockproduct = "UPDATE snack SET stock = stock + ? where id = ?;";
         sqlite3_stmt* stmt;
         
         if (sqlite3_prepare_v2(db, restockproduct, -1, &stmt, nullptr) != SQLITE_OK) {
@@ -295,12 +428,81 @@ public:
         
 
         sqlite3_bind_int(stmt, 1, amount);
-        sqlite3_bind_text(stmt, 2, name.c_str(), -1, SQLITE_STATIC);
+        sqlite3_bind_int(stmt, 2, id);
         
-        if (sqlite3_step(stmt) != SQLITE_OK) {
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
             cerr << "Error restocking||" << sqlite3_errmsg(db) << endl;
         }
         
+    }
+
+    void AdminRemoveProduct() {
+        DisplayProduct("snack");
+        const char* TempTable = R"(
+CREATE TABLE IF NOT EXISTS temptable (
+id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+name TEXT NOT NULL UNIQUE,
+price INTEGER NOT NULL,
+stock INTEGER NOT NULL
+);
+)";
+
+        if (sqlite3_exec(db, TempTable, nullptr, nullptr, &errMsg) != SQLITE_OK) {
+            cerr << "Error Creating temptable:" << errMsg << endl;
+        }
+        int productlen = GetProductLen();
+        int removeid;
+        cout << "ID of the product you want to remove:";
+        cin >> removeid;
+        for (int i = 1; i <= productlen; i++) {
+            if (i != removeid) {
+                Product prod = GetProductInfo(i);
+                InsertProduct(prod.name, prod.price, prod.stock);
+            }
+        }
+
+        DeleteTable("snack");
+        RenameTableToSnack();
+        DisplayProduct("snack");
+
+        
+
+    }
+    void ShowMoney() {
+        const char* checkmoney = "SELECT * FROM money;";
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(db, checkmoney, -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Peparing to check money:" << sqlite3_errmsg(db) << endl;
+        }
+
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int value = sqlite3_column_int(stmt, 0);
+            int amount = sqlite3_column_int(stmt, 1);
+            cout << "Value:" << value << " ||Amount:" << amount << endl;
+        }
+    }
+
+    void ShowHistory() {
+        const char* viewhistory = "SELECT * FROM history;";
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(db, viewhistory, -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << "Error Displaying History || " << sqlite3_errmsg(db) << endl;
+        }
+
+
+        cout << "-------------------------------------" << endl;
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int id = sqlite3_column_int(stmt, 0);
+            const char* name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
+            int studentidd = sqlite3_column_int(stmt, 2);
+            int price = sqlite3_column_int(stmt, 3);
+            cout << "[" << id << "] " << name << " |Price:" << price << " |Buyer:" << studentidd << endl;
+        }
+        cout << "-------------------------------------" << endl;
+        sqlite3_finalize(stmt);
     }
 };
 
@@ -319,17 +521,14 @@ public:
         while (sqlite3_step(stmt) == SQLITE_ROW) {
             int value = sqlite3_column_int(stmt, 0);
             int amount = sqlite3_column_int(stmt, 1);
-            cout << "Value:" << value << " ||Amount:" << amount << endl;
-            if (amount == 0) {
+            //cout << "Value:" << value << " ||Amount:" << amount << endl;
+            if (amount <= 1) {
                 CloseVendingMachine();
             }
         }
     }
 
-    void CloseVendingMachine() {
-        cout << "Vending Machine Closed." << endl;
-        exit(0);
-    }
+    
 
     int AskPayment() {
         int money;
@@ -366,7 +565,9 @@ public:
 
     void GiveChange(int amount) {
         amount = amount * -1;
+        cout << "Amount Of changes:" << amount << endl;
         while (amount > 1) {
+            CheckMoney();
             if (amount >= 100) {
                 InsertMoney(100, -1);
                 amount -= 100;
@@ -388,11 +589,11 @@ public:
                 amount -= 1;
             }
 
-            cout << "Amount Of changes:" << amount << endl;
+            
         }
     }
 
-    void ChooseProduct() {
+    void BuyProduct() {
         int choice;
         DisplayProduct("snack");
         cout << "Choose Product:";
@@ -403,11 +604,28 @@ public:
             to_pay = to_pay - AskPayment();
             CheckMoney();
         }
-        cout << to_pay << endl;
         if (to_pay < 0) {
             GiveChange(to_pay);
         }
+        RemoveProduct(choice);
+        InsertHistory(choice);
+    }
 
+    void InsertHistory(int id) {
+        Product prod = GetProductInfo(id);
+        string inserthistorystmt = "INSERT INTO history (name,buyerid,price) VALUES\n('" + prod.name + "'," + to_string(studentid) + "," + to_string(prod.price) + ")";
+        sqlite3_stmt* stmt;
+
+        if (sqlite3_prepare_v2(db, inserthistorystmt.c_str(), -1, &stmt, nullptr) != SQLITE_OK) {
+            cerr << sqlite3_errmsg(db) << endl;
+        }
+
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            cerr << sqlite3_errmsg(db) << endl;
+        }
+   
+        
+        sqlite3_finalize(stmt);
     }
 };
 
@@ -417,9 +635,20 @@ public:
 
 int main()
 {
-
-    Admin a;
-    a.AdminMenu();
+    //Setup(); //Run This for the first time
+    int choice;
+    VendingMachine a;
+    
+    cout << "[1]Admin Mode || [2]Usermode\nEnter:";
+    cin >> choice;
+    if (choice == 1) {
+        a.AdminMenu();
+    }
+    else {
+        a.Login();
+        a.BuyProduct();
+    }
+    
     
     
 
